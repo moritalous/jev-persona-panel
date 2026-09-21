@@ -62,10 +62,22 @@ TYPESAFE_API_KEY=（TypeSafe AI の API キー）
 - **`NEXT_PUBLIC_` を付けないでください。** 付けるとキーがブラウザへ配信されます。
   キーはサーバー側の Route Handler からのみ参照します。
 
-`TYPESAFE_API_KEY` のかわりに **`AI_GATEWAY_API_KEY`** を設定すると、
-[Vercel AI Gateway](https://vercel.com/docs/ai-gateway/typesafe-api) 経由で
-Jev を呼びます（両方あれば Gateway を優先）。宛先とモデル ID の差し替えは
-`lib/jev.ts` が行うので、設定するキーを変えるだけで切り替わります。
+### 資格情報の優先順位
+
+`lib/jev.ts` は、次の順で見つかったものを使います。宛先とモデル ID の差し替えも
+そこで行うので、**どれを使うかは設定だけで決まり、コードは変わりません。**
+
+| 順 | 資格情報 | 経路 | 備考 |
+| --- | --- | --- | --- |
+| 1 | `AI_GATEWAY_API_KEY` | AI Gateway | 明示した鍵は OIDC より優先 |
+| 2 | Vercel の OIDC トークン | AI Gateway | **Vercel では設定不要。最も安全** |
+| 3 | `TYPESAFE_API_KEY` | TypeSafe へ直接 | ローカル開発向け |
+| — | なし | — | モックモード |
+
+Vercel へデプロイするなら **2 の OIDC を勧めます。** Vercel がプロジェクトごとに
+12時間で失効する短命トークンを自動発行するため、**長期間有効な秘密を
+environment variables に置く必要がありません。** トークンはリクエストごとに
+取り直します（[@vercel/oidc](https://www.npmjs.com/package/@vercel/oidc)）。
 
 ### 起動
 
@@ -90,9 +102,13 @@ vercel --prod # 本番へ
 GitHub と連携する場合は、Vercel のダッシュボードでリポジトリを Import するだけです。
 Next.js として自動検出されるので、ビルド設定の変更は要りません。
 
-デプロイ後、**Project → Settings → Environment Variables** に
-`TYPESAFE_API_KEY`（または `AI_GATEWAY_API_KEY`）を登録してから再デプロイしてください。
-未登録のままだとモックモードで動きます。
+**推奨構成では API キーを登録しません。** OIDC を有効にすれば、Vercel が
+短命トークンを注入します（Project → Settings → Security → OIDC Federation）。
+環境変数が何も無い状態でも、OIDC が効いていれば Gateway 経由で動きます。
+
+`/api/judge` は誰でも叩ける公開エンドポイントなので、
+**AI Gateway 側でプロジェクトに予算上限（Budget）を設定してください。**
+鍵を盗まれる経路を塞いでも、呼ばれる量は別に抑える必要があります。
 
 | 項目 | 値 | 備考 |
 | --- | --- | --- |
@@ -101,6 +117,9 @@ Next.js として自動検出されるので、ビルド設定の変更は要り
 | ランタイム | Node.js | SDK が Node.js 20以上を要求するため、Edge では動きません |
 
 判定は 1.5〜1.6 秒で返るので、60秒は十分な余裕を見た値です。
+
+経路の確認は、画面下部「この回の記録」のモデル名で行えます。
+`typesafe-ai/jev` なら Gateway 経由、`jev-1.13.0` なら TypeSafe へ直接です。
 
 ## スクリプト
 
