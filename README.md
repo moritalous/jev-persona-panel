@@ -69,15 +69,23 @@ TYPESAFE_API_KEY=（TypeSafe AI の API キー）
 
 | 順 | 資格情報 | 経路 | 備考 |
 | --- | --- | --- | --- |
-| 1 | `AI_GATEWAY_API_KEY` | AI Gateway | 明示した鍵は OIDC より優先 |
-| 2 | Vercel の OIDC トークン | AI Gateway | **Vercel では設定不要。最も安全** |
-| 3 | `TYPESAFE_API_KEY` | TypeSafe へ直接 | ローカル開発向け |
+| 1 | `AI_GATEWAY_API_KEY` | AI Gateway | |
+| 2 | `TYPESAFE_API_KEY` | TypeSafe へ直接 | |
+| 3 | Vercel の OIDC トークン | AI Gateway | **秘密をどこにも置かない。設定不要** |
 | — | なし | — | モックモード |
 
-Vercel へデプロイするなら **2 の OIDC を勧めます。** Vercel がプロジェクトごとに
-12時間で失効する短命トークンを自動発行するため、**長期間有効な秘密を
-environment variables に置く必要がありません。** トークンはリクエストごとに
-取り直します（[@vercel/oidc](https://www.npmjs.com/package/@vercel/oidc)）。
+明示した鍵を OIDC より先に見るのは、環境変数を足しただけで経路が黙って
+変わらないようにするためです。**OIDC を使うときは、鍵のほうを消します。**
+
+OIDC を使うと、Vercel が短命トークンを自動発行するため、長期間有効な秘密を
+environment variables に置かずに済みます。トークンは本番ではリクエストの
+`x-vercel-oidc-token` ヘッダーから、ローカルでは `vercel env pull` が書いた
+`VERCEL_OIDC_TOKEN` から取ります（[@vercel/oidc](https://www.npmjs.com/package/@vercel/oidc)）。
+
+> **AI Gateway の無料枠は、いまのところ安定しません。** 実測で10回中3回ほど
+> 上流混雑（503 / 429）で失敗します。自分の TypeSafe キーで直接叩く場合は
+> 12回中12回成功・約700msでした。無料枠は共有の資格情報を使うためで、
+> 自分の枠を使う BYOK は有料枠（クレジット購入）が必要です。
 
 ### 起動
 
@@ -102,9 +110,11 @@ vercel --prod # 本番へ
 GitHub と連携する場合は、Vercel のダッシュボードでリポジトリを Import するだけです。
 Next.js として自動検出されるので、ビルド設定の変更は要りません。
 
-**推奨構成では API キーを登録しません。** OIDC を有効にすれば、Vercel が
-短命トークンを注入します（Project → Settings → Security → OIDC Federation）。
-環境変数が何も無い状態でも、OIDC が効いていれば Gateway 経由で動きます。
+`TYPESAFE_API_KEY` を登録すれば TypeSafe へ直接つなぎます。安定して速いのはこちらです。
+
+秘密を置きたくない場合は、**環境変数を何も登録せず**に OIDC へ任せます
+（Project → Settings → Security → Secure Backend Access が有効であること）。
+ただし上の注意書きのとおり、無料枠では失敗が混ざります。
 
 `/api/judge` は誰でも叩ける公開エンドポイントなので、
 **AI Gateway 側でプロジェクトに予算上限（Budget）を設定してください。**
