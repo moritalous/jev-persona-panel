@@ -1,0 +1,11 @@
+# git blame から除外するコミット（整形のみの変更など）。
+#
+# GitHub はこのファイル名を自動的に認識します。
+# ローカルの git blame にも反映するには、一度だけ次を実行してください:
+#
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# 一括フォーマットを行ったら、そのコミットのハッシュを1行ずつ追記します。
+# 例:
+#   # Apply Biome formatting across the codebase
+#   0000000000000000000000000000000000000000

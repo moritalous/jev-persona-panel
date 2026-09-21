@@ -1,0 +1,26 @@
+# 依存パッケージ
+node_modules/
+
+# ビルド成果物
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# 環境変数（APIキーを含むためコミットしない）
+.env
+.env.local
+.env*.local
+
+# デプロイ
+.vercel/
+
+# ローカル固有の設定・ログ
+mise.local.toml
+*.log
+npm-debug.log*
+
+# OS / エディタ
+.DS_Store
+.idea/
+.vscode/
