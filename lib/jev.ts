@@ -78,12 +78,31 @@ function gatewayCredentials(apiKey: string): Credentials {
 }
 
 /**
+ * OIDC を試す価値がある環境か。
+ *
+ * Vercel 上では、トークンはリクエストの `x-vercel-oidc-token` ヘッダーで渡され、
+ * process.env には現れない。環境変数だけを見ていると本番で必ず素通りしてしまう。
+ * ローカルでは vercel env pull が VERCEL_OIDC_TOKEN を書くので、そちらも見る。
+ */
+function mayHaveOidc(): boolean {
+  return Boolean(
+    process.env.VERCEL ??
+      process.env.VERCEL_ENV ??
+      process.env.VERCEL_OIDC_TOKEN,
+  );
+}
+
+/**
  * 使う資格情報を決める。上から順に、見つかったものを使う。
  *
- * 1. AI_GATEWAY_API_KEY … Gateway 経由。明示した鍵は OIDC より優先する（Vercel の既定の挙動に合わせる）
- * 2. Vercel の OIDC トークン … Gateway 経由。12時間で失効する短命トークンなので、
- *    毎リクエスト取り直す。長期の秘密を環境変数に置かずに済む、いちばん安全な経路。
- * 3. TYPESAFE_API_KEY … TypeSafe へ直接
+ * 1. AI_GATEWAY_API_KEY … Gateway 経由
+ * 2. TYPESAFE_API_KEY  … TypeSafe へ直接
+ * 3. Vercel の OIDC トークン … Gateway 経由。短命トークンなので毎リクエスト取り直す。
+ *    長期の秘密をどこにも置かずに済む、いちばん安全な経路。
+ *
+ * 明示した鍵を OIDC より先に見るのは、Vercel 自身の優先順位に合わせるためと、
+ * 環境変数を足しただけで経路が黙って変わらないようにするため。
+ * OIDC を使うときは、鍵のほうを消して明示的に切り替える。
  *
  * どれも無ければ null を返し、呼び出し側がモックモードへ落ちる。
  */
@@ -91,8 +110,10 @@ async function credentials(): Promise<Credentials | null> {
   const gatewayKey = process.env.AI_GATEWAY_API_KEY?.trim();
   if (gatewayKey) return gatewayCredentials(gatewayKey);
 
-  // Vercel 上では自動で注入される。ローカルでは vercel env pull で取得する。
-  if (process.env.VERCEL_OIDC_TOKEN) {
+  const directKey = process.env.TYPESAFE_API_KEY?.trim();
+  if (directKey) return { apiKey: directKey };
+
+  if (mayHaveOidc()) {
     try {
       // 失効の5分前から取り直す
       const token = await getVercelOidcToken({
@@ -100,13 +121,10 @@ async function credentials(): Promise<Credentials | null> {
       });
       if (token) return gatewayCredentials(token);
     } catch (error) {
-      // OIDC が使えない環境なら、下の直接接続やモックモードへ落とす
+      // OIDC が使えない環境ならモックモードへ落とす
       console.warn("[judge] OIDC トークンを取得できませんでした:", error);
     }
   }
-
-  const directKey = process.env.TYPESAFE_API_KEY?.trim();
-  if (directKey) return { apiKey: directKey };
 
   return null;
 }

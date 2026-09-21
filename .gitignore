@@ -8,9 +8,10 @@ next-env.d.ts
 *.tsbuildinfo
 
 # 環境変数（APIキーを含むためコミットしない）
-.env
-.env.local
-.env*.local
+# vercel env pull が任意の名前で書き出すため、.env で始まるものは既定で全て無視し、
+# 中身の無いテンプレートだけを例外にする。
+.env*
+!.env.example
 
 # デプロイ
 .vercel/
