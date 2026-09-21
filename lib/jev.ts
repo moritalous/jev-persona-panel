@@ -1,4 +1,5 @@
 import { noul, type Questions, score, TypeSafeClient } from "@typesafe-ai/sdk";
+import { getVercelOidcToken } from "@vercel/oidc";
 import {
   type Judgement,
   type JudgeResponse,
@@ -68,20 +69,40 @@ type Credentials = {
   defaultModel?: string;
 };
 
+function gatewayCredentials(apiKey: string): Credentials {
+  return {
+    apiKey,
+    baseURL: GATEWAY_BASE_URL,
+    defaultModel: process.env.TYPESAFE_DEFAULT_MODEL?.trim() || GATEWAY_MODEL,
+  };
+}
+
 /**
- * 使う資格情報を決める。
+ * 使う資格情報を決める。上から順に、見つかったものを使う。
  *
- * AI_GATEWAY_API_KEY があれば Gateway 経由、無ければ TypeSafe へ直接。
- * どちらも無ければ null を返し、呼び出し側がモックモードへ落ちる。
+ * 1. AI_GATEWAY_API_KEY … Gateway 経由。明示した鍵は OIDC より優先する（Vercel の既定の挙動に合わせる）
+ * 2. Vercel の OIDC トークン … Gateway 経由。12時間で失効する短命トークンなので、
+ *    毎リクエスト取り直す。長期の秘密を環境変数に置かずに済む、いちばん安全な経路。
+ * 3. TYPESAFE_API_KEY … TypeSafe へ直接
+ *
+ * どれも無ければ null を返し、呼び出し側がモックモードへ落ちる。
  */
-function credentials(): Credentials | null {
+async function credentials(): Promise<Credentials | null> {
   const gatewayKey = process.env.AI_GATEWAY_API_KEY?.trim();
-  if (gatewayKey) {
-    return {
-      apiKey: gatewayKey,
-      baseURL: GATEWAY_BASE_URL,
-      defaultModel: process.env.TYPESAFE_DEFAULT_MODEL?.trim() || GATEWAY_MODEL,
-    };
+  if (gatewayKey) return gatewayCredentials(gatewayKey);
+
+  // Vercel 上では自動で注入される。ローカルでは vercel env pull で取得する。
+  if (process.env.VERCEL_OIDC_TOKEN) {
+    try {
+      // 失効の5分前から取り直す
+      const token = await getVercelOidcToken({
+        expirationBufferMs: 5 * 60 * 1000,
+      });
+      if (token) return gatewayCredentials(token);
+    } catch (error) {
+      // OIDC が使えない環境なら、下の直接接続やモックモードへ落とす
+      console.warn("[judge] OIDC トークンを取得できませんでした:", error);
+    }
   }
 
   const directKey = process.env.TYPESAFE_API_KEY?.trim();
@@ -90,12 +111,8 @@ function credentials(): Credentials | null {
   return null;
 }
 
-export function hasApiKey(): boolean {
-  return credentials() !== null;
-}
-
 export async function judge(idea: string): Promise<JudgeResponse> {
-  const creds = credentials();
+  const creds = await credentials();
   if (!creds) return mockJudge(idea);
 
   const client = new TypeSafeClient({ ...creds, timeout: TIMEOUT_MS });
