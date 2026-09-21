@@ -49,14 +49,56 @@ function buildQuestions(): Questions {
   return questions;
 }
 
+/**
+ * Vercel AI Gateway 経由で Jev を呼ぶときの入口。
+ * SDK はそのままで、宛先と鍵を差し替えるだけで通る。
+ * https://vercel.com/docs/ai-gateway/typesafe-api
+ */
+const GATEWAY_BASE_URL = "https://ai-gateway.vercel.sh/typesafe";
+
+/**
+ * Gateway 側のモデル ID。直接叩くときの既定（jev-latest）とは名前が違うため、
+ * Gateway 経由のときだけ明示する。TYPESAFE_DEFAULT_MODEL があればそちらを優先する。
+ */
+const GATEWAY_MODEL = "typesafe-ai/jev";
+
+type Credentials = {
+  apiKey: string;
+  baseURL?: string;
+  defaultModel?: string;
+};
+
+/**
+ * 使う資格情報を決める。
+ *
+ * AI_GATEWAY_API_KEY があれば Gateway 経由、無ければ TypeSafe へ直接。
+ * どちらも無ければ null を返し、呼び出し側がモックモードへ落ちる。
+ */
+function credentials(): Credentials | null {
+  const gatewayKey = process.env.AI_GATEWAY_API_KEY?.trim();
+  if (gatewayKey) {
+    return {
+      apiKey: gatewayKey,
+      baseURL: GATEWAY_BASE_URL,
+      defaultModel: process.env.TYPESAFE_DEFAULT_MODEL?.trim() || GATEWAY_MODEL,
+    };
+  }
+
+  const directKey = process.env.TYPESAFE_API_KEY?.trim();
+  if (directKey) return { apiKey: directKey };
+
+  return null;
+}
+
 export function hasApiKey(): boolean {
-  return Boolean(process.env.TYPESAFE_API_KEY?.trim());
+  return credentials() !== null;
 }
 
 export async function judge(idea: string): Promise<JudgeResponse> {
-  if (!hasApiKey()) return mockJudge(idea);
+  const creds = credentials();
+  if (!creds) return mockJudge(idea);
 
-  const client = new TypeSafeClient({ timeout: TIMEOUT_MS });
+  const client = new TypeSafeClient({ ...creds, timeout: TIMEOUT_MS });
   const questions = buildQuestions();
   const startedAt = Date.now();
 

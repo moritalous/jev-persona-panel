@@ -3,24 +3,33 @@
  * 外部アセットに依存せず、同じ id なら常に同じ見た目になる。
  */
 
-const SKINS = ["#f6d5bd", "#e8bd9a", "#c68a63", "#8d5a3c"];
+const SKINS = ["#f7d9c0", "#efc4a2", "#d9a074", "#b47a4f", "#8a5636"];
+
 const HAIRS = [
-  "#2b2b33",
-  "#4b3527",
-  "#7a6a5a",
-  "#b9b3ad",
-  "#e7e2db",
-  "#6b3f2a",
+  "#23222a",
+  "#3f2c20",
+  "#5d4632",
+  "#8a7b6b",
+  "#b9b2a8",
+  "#e3ded6",
+  "#6e3a24",
 ];
+
+/**
+ * 服の色。舞台の照明（暖色／寒色）のどちらに置かれても濁らないよう、
+ * 彩度を抑えた中明度の色で揃えている。
+ */
 const SHIRTS = [
-  "#4f8ef7",
-  "#ef5f8a",
-  "#3fbf8f",
-  "#f0a93b",
-  "#8a6ef0",
-  "#43b6d6",
-  "#e0625a",
-  "#6f8f3f",
+  "#3f6fa8",
+  "#c2573f",
+  "#3f8f77",
+  "#c99141",
+  "#6b5f9c",
+  "#4d8ba3",
+  "#a8504f",
+  "#6f7f45",
+  "#8a5f7a",
+  "#4a5566",
 ];
 
 export type AvatarParts = {
@@ -30,6 +39,10 @@ export type AvatarParts = {
   hairStyle: number;
   eyeStyle: number;
   mouthStyle: number;
+  /** 眼鏡の有無 */
+  glasses: boolean;
+  /** 髭の種類。0 は無し。 */
+  beard: number;
 };
 
 function hash(seed: string): number {
@@ -48,9 +61,12 @@ export function avatarParts(id: string): AvatarParts {
     skin: SKINS[h % SKINS.length],
     hair: HAIRS[(h >>> 3) % HAIRS.length],
     shirt: SHIRTS[(h >>> 7) % SHIRTS.length],
-    hairStyle: (h >>> 11) % 6,
-    eyeStyle: (h >>> 15) % 3,
-    mouthStyle: (h >>> 19) % 3,
+    hairStyle: (h >>> 11) % 8,
+    eyeStyle: (h >>> 15) % 4,
+    mouthStyle: (h >>> 19) % 4,
+    // 3人に1人ほどが眼鏡、5人に1人ほどが髭
+    glasses: (h >>> 23) % 3 === 0,
+    beard: (h >>> 26) % 5 === 0 ? ((h >>> 28) % 2) + 1 : 0,
   };
 }
 

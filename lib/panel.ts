@@ -29,6 +29,18 @@ export const LEVELS = [
 
 export const MAX_SCORE = LEVELS.length - 1;
 
+/**
+ * 画面に並べるときの短い見出し。
+ * Jev へ渡すのはあくまで LEVELS のほうで、こちらは表示専用。
+ */
+export const LEVEL_LABELS = [
+  "興味なし",
+  "懐疑的",
+  "中立",
+  "関心あり",
+  "強い関心",
+] as const;
+
 export type ZoneKey = "interested" | "neutral" | "not";
 
 export type Zone = {
